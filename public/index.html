@@ -7,12 +7,43 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
-    href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
     rel="stylesheet"
   />
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body class="locked">
+  <section class="login-page" id="login-page">
+    <div class="login-bg" aria-hidden="true"></div>
+    <div class="login-card">
+      <div class="login-brand">
+        <span class="brand-mark"></span>
+        <span class="brand-name">Ledger</span>
+      </div>
+      <h1 class="login-title">Connexion</h1>
+      <p class="login-sub">Accédez à votre tableau de gestion de stock.</p>
+      <form id="login-form" class="login-form" autocomplete="on">
+        <label>
+          <span>Email</span>
+          <input type="email" id="login-email" placeholder="vous@exemple.com" required />
+        </label>
+        <label>
+          <span>Mot de passe</span>
+          <input type="password" id="login-password" placeholder="••••••••" required minlength="1" />
+        </label>
+        <div class="login-row">
+          <label class="check">
+            <input type="checkbox" id="login-remember" />
+            <span>Se souvenir de moi</span>
+          </label>
+          <a href="#" class="login-link" onclick="event.preventDefault()">Mot de passe oublié ?</a>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Se connecter</button>
+        <p class="login-hint">Démo — n'importe quel email et mot de passe suffisent.</p>
+      </form>
+    </div>
+  </section>
+
   <aside class="sidebar">
     <div class="brand">
       <span class="brand-mark"></span>
@@ -44,11 +75,16 @@
     </nav>
 
     <div class="sidebar-foot">
-      <div class="status">
-        <span class="dot"></span>
-        <span>Connecté</span>
+      <div class="user-chip" id="user-chip">
+        <span class="avatar" id="user-avatar">A</span>
+        <div class="user-meta">
+          <span class="user-name" id="user-name">Utilisateur</span>
+          <span class="user-role">Administrateur</span>
+        </div>
+        <button class="icon-btn" id="btn-logout" title="Se déconnecter">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
       </div>
-      <span class="version">v1.0</span>
     </div>
   </aside>
 

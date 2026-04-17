@@ -631,11 +631,91 @@ function bindEls() {
   els.stockForm = document.getElementById("stock-form");
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  bindEls();
+/* ============== AUTH ============== */
+
+const AUTH_KEY = "ledger-auth";
+
+function getSession() {
+  try {
+    const raw = localStorage.getItem(AUTH_KEY) || sessionStorage.getItem(AUTH_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setSession(data, persist) {
+  const s = persist ? localStorage : sessionStorage;
+  const other = persist ? sessionStorage : localStorage;
+  s.setItem(AUTH_KEY, JSON.stringify(data));
+  other.removeItem(AUTH_KEY);
+}
+
+function clearSession() {
+  localStorage.removeItem(AUTH_KEY);
+  sessionStorage.removeItem(AUTH_KEY);
+}
+
+function applySessionUI(session) {
+  if (!session) return;
+  const name = session.email.split("@")[0] || "Utilisateur";
+  const pretty = name.charAt(0).toUpperCase() + name.slice(1);
+  document.getElementById("user-name").textContent = pretty;
+  document.getElementById("user-avatar").textContent = pretty.charAt(0);
+}
+
+function unlock(session) {
+  document.body.classList.remove("locked");
+  applySessionUI(session);
+  if (!unlock._booted) {
+    unlock._booted = true;
+    bootApp();
+  }
+}
+
+function lock() {
+  document.body.classList.add("locked");
+}
+
+function wireLogin() {
+  const form = document.getElementById("login-form");
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const email = document.getElementById("login-email").value.trim();
+    const password = document.getElementById("login-password").value;
+    const remember = document.getElementById("login-remember").checked;
+    if (!email || !password) return;
+    const session = { email, loginAt: Date.now() };
+    setSession(session, remember);
+    unlock(session);
+    form.reset();
+  });
+
+  document.getElementById("btn-logout").addEventListener("click", () => {
+    if (!confirm("Se déconnecter ?")) return;
+    clearSession();
+    lock();
+    document.getElementById("login-email").focus();
+  });
+}
+
+/* ============== BOOT ============== */
+
+function bootApp() {
   initTodayLabel();
   wireModals();
   wireNav();
   refresh();
   setInterval(refresh, 30000);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  bindEls();
+  wireLogin();
+  const session = getSession();
+  if (session) unlock(session);
+  else {
+    lock();
+    setTimeout(() => document.getElementById("login-email").focus(), 50);
+  }
 });
