@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestion de Stock</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Gestion de Stock</h1>
+    <p class="subtitle">Suivi des produits et mouvements</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Ajouter un produit</h2>
+      <form id="add-product-form" class="row">
+        <input type="text" id="product-name" placeholder="Nom du produit" required />
+        <input type="number" id="product-qty" placeholder="Quantité initiale" min="0" value="0" required />
+        <button type="submit">Créer</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Produits en stock</h2>
+      <table id="products-table">
+        <thead>
+          <tr>
+            <th>Nom</th>
+            <th>Quantité</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="products-body"></tbody>
+      </table>
+      <p id="empty-msg" class="empty">Aucun produit. Ajoute ton premier produit ci-dessus.</p>
+    </section>
+
+    <section class="card">
+      <h2>Historique des mouvements</h2>
+      <ul id="history-list"></ul>
+      <p id="empty-history" class="empty">Aucun mouvement enregistré.</p>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
