@@ -1,84 +1,72 @@
-const STORAGE_KEY = "stock-app-data";
+const API = "/api";
 
-const state = {
-  products: [],
-  history: [],
-};
+async function api(path, options = {}) {
+  const res = await fetch(API + path, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+  if (res.status === 204) return null;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Erreur inconnue");
+  return data;
+}
 
-function load() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw);
-      state.products = parsed.products || [];
-      state.history = parsed.history || [];
-    } catch {
-      state.products = [];
-      state.history = [];
-    }
+const state = { products: [], history: [] };
+
+async function refresh() {
+  try {
+    const [products, history] = await Promise.all([
+      api("/products"),
+      api("/history?limit=50"),
+    ]);
+    state.products = products;
+    state.history = history;
+    render();
+  } catch (err) {
+    showError(err.message);
   }
 }
 
-function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+function showError(msg) {
+  const el = document.getElementById("error-banner");
+  el.textContent = msg;
+  el.style.display = "block";
+  clearTimeout(showError._t);
+  showError._t = setTimeout(() => { el.style.display = "none"; }, 4000);
 }
 
-function uid() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-}
-
-function addProduct(name, qty) {
-  const existing = state.products.find(p => p.name.toLowerCase() === name.toLowerCase());
-  if (existing) {
-    alert("Un produit avec ce nom existe déjà.");
-    return;
+async function addProduct(name, qty) {
+  try {
+    await api("/products", {
+      method: "POST",
+      body: JSON.stringify({ name, qty }),
+    });
+    await refresh();
+  } catch (err) {
+    showError(err.message);
   }
-  state.products.push({ id: uid(), name, qty });
-  state.history.unshift({
-    id: uid(),
-    productName: name,
-    type: "create",
-    amount: qty,
-    date: new Date().toISOString(),
-  });
-  save();
-  render();
 }
 
-function changeStock(id, delta) {
-  const product = state.products.find(p => p.id === id);
-  if (!product) return;
-  const newQty = product.qty + delta;
-  if (newQty < 0) {
-    alert("Stock insuffisant.");
-    return;
+async function changeStock(id, delta) {
+  try {
+    await api(`/products/${id}/stock`, {
+      method: "POST",
+      body: JSON.stringify({ delta }),
+    });
+    await refresh();
+  } catch (err) {
+    showError(err.message);
   }
-  product.qty = newQty;
-  state.history.unshift({
-    id: uid(),
-    productName: product.name,
-    type: delta > 0 ? "in" : "out",
-    amount: Math.abs(delta),
-    date: new Date().toISOString(),
-  });
-  save();
-  render();
 }
 
-function deleteProduct(id) {
-  const product = state.products.find(p => p.id === id);
-  if (!product) return;
-  if (!confirm(`Supprimer "${product.name}" ?`)) return;
-  state.products = state.products.filter(p => p.id !== id);
-  state.history.unshift({
-    id: uid(),
-    productName: product.name,
-    type: "delete",
-    amount: product.qty,
-    date: new Date().toISOString(),
-  });
-  save();
-  render();
+async function deleteProduct(id, name) {
+  if (!confirm(`Supprimer "${name}" ?`)) return;
+  try {
+    await api(`/products/${id}`, { method: "DELETE" });
+    await refresh();
+  } catch (err) {
+    showError(err.message);
+  }
 }
 
 function promptAmount(label) {
@@ -86,7 +74,7 @@ function promptAmount(label) {
   if (raw === null) return null;
   const n = parseInt(raw, 10);
   if (isNaN(n) || n <= 0) {
-    alert("Quantité invalide.");
+    showError("Quantité invalide.");
     return null;
   }
   return n;
@@ -137,7 +125,7 @@ function renderProducts() {
     const delBtn = document.createElement("button");
     delBtn.className = "danger";
     delBtn.textContent = "Suppr";
-    delBtn.onclick = () => deleteProduct(p.id);
+    delBtn.onclick = () => deleteProduct(p.id, p.name);
 
     actionsDiv.append(addBtn, subBtn, delBtn);
     actionsTd.appendChild(actionsDiv);
@@ -158,17 +146,24 @@ function renderHistory() {
   }
   empty.style.display = "none";
 
-  for (const h of state.history.slice(0, 50)) {
+  for (const h of state.history) {
     const li = document.createElement("li");
-    const date = new Date(h.date).toLocaleString("fr-FR");
+    const date = new Date(h.created_at.replace(" ", "T") + "Z").toLocaleString("fr-FR");
+    const name = escapeHtml(h.product_name);
     let label = "";
-    if (h.type === "in") label = `<span class="mov-in">+${h.amount}</span> ajouté à <strong>${h.productName}</strong>`;
-    else if (h.type === "out") label = `<span class="mov-out">−${h.amount}</span> retiré de <strong>${h.productName}</strong>`;
-    else if (h.type === "create") label = `Produit <strong>${h.productName}</strong> créé (qté: ${h.amount})`;
-    else if (h.type === "delete") label = `Produit <strong>${h.productName}</strong> supprimé`;
+    if (h.type === "in") label = `<span class="mov-in">+${h.amount}</span> ajouté à <strong>${name}</strong>`;
+    else if (h.type === "out") label = `<span class="mov-out">−${h.amount}</span> retiré de <strong>${name}</strong>`;
+    else if (h.type === "create") label = `Produit <strong>${name}</strong> créé (qté: ${h.amount})`;
+    else if (h.type === "delete") label = `Produit <strong>${name}</strong> supprimé`;
     li.innerHTML = `${label}<span class="time">${date}</span>`;
     list.appendChild(li);
   }
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
 }
 
 function render() {
@@ -176,15 +171,14 @@ function render() {
   renderHistory();
 }
 
-document.getElementById("add-product-form").addEventListener("submit", (e) => {
+document.getElementById("add-product-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = document.getElementById("product-name").value.trim();
   const qty = parseInt(document.getElementById("product-qty").value, 10);
   if (!name || isNaN(qty) || qty < 0) return;
-  addProduct(name, qty);
+  await addProduct(name, qty);
   e.target.reset();
   document.getElementById("product-qty").value = 0;
 });
 
-load();
-render();
+refresh();

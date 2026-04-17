@@ -1,15 +1,60 @@
 # Gestion de Stock
 
-Petite app web de gestion de stock. HTML/CSS/JS pur, persistance via `localStorage`.
+App web complète de gestion de stock. Backend Node.js/Express + SQLite, frontend vanilla JS.
 
-## Fonctionnalités
+## Stack
 
-- Ajout d'un produit (nom + quantité initiale)
-- Ajout de stock sur un produit existant
-- Retrait de stock (avec contrôle pour éviter les quantités négatives)
-- Suppression d'un produit
-- Historique des mouvements
+- **Backend:** Node.js, Express, better-sqlite3
+- **Frontend:** HTML/CSS/JS (dans `public/`)
+- **DB:** SQLite (fichier `stock.db` créé au démarrage)
+
+## Installation
+
+```bash
+npm install
+```
 
 ## Lancer
 
-Ouvre `index.html` dans un navigateur. Aucune dépendance, aucun build.
+```bash
+npm start
+```
+
+Puis ouvrir http://localhost:3000
+
+Mode dev avec reload :
+
+```bash
+npm run dev
+```
+
+## Fonctionnalités
+
+- Création de produits (nom unique + quantité initiale)
+- Ajout / retrait de stock avec garde anti-négatif
+- Suppression de produit
+- Historique persistant des mouvements (create/in/out/delete)
+
+## API
+
+| Méthode | Route                        | Description                         |
+|---------|------------------------------|-------------------------------------|
+| GET     | `/api/products`              | Liste des produits                  |
+| POST    | `/api/products`              | Créer `{name, qty}`                 |
+| POST    | `/api/products/:id/stock`    | Ajuster stock `{delta}` (+/-)       |
+| DELETE  | `/api/products/:id`          | Supprimer un produit                |
+| GET     | `/api/history?limit=50`      | Historique des mouvements           |
+
+## Structure
+
+```
+.
+├── server.js       # Express API + static
+├── db.js           # SQLite init + schéma
+├── package.json
+├── public/         # Frontend servi en statique
+│   ├── index.html
+│   ├── style.css
+│   └── app.js
+└── stock.db        # Créé au premier lancement (gitignore)
+```
