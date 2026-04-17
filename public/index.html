@@ -7,154 +7,209 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
-    href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,700;1,9..144,400;1,9..144,600&family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
     rel="stylesheet"
   />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="grain" aria-hidden="true"></div>
-  <div class="glow glow-1" aria-hidden="true"></div>
-  <div class="glow glow-2" aria-hidden="true"></div>
-
-  <nav class="topbar">
+  <aside class="sidebar">
     <div class="brand">
       <span class="brand-mark"></span>
-      <span class="brand-name">Ledger<em>.</em></span>
+      <span class="brand-name">Ledger</span>
     </div>
-    <div class="topbar-meta">
-      <span class="dot"></span>
-      <span id="live-label">Connecté</span>
-    </div>
-    <div class="topbar-actions">
-      <button class="btn btn-ghost" id="btn-seed-info" title="Pour générer des données, exécuter `npm run seed`">Données de démo</button>
-      <button class="btn btn-primary" id="btn-open-add">
-        <span>＋</span> Nouveau produit
-      </button>
-    </div>
-  </nav>
 
-  <div id="error-banner" role="alert"></div>
+    <nav class="nav">
+      <span class="nav-section">Espace</span>
+      <a href="#dashboard" class="nav-item active" data-view="dashboard">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+        <span>Tableau de bord</span>
+      </a>
+      <a href="#products" class="nav-item" data-view="products">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 7 12 3 4 7v10l8 4 8-4V7Z"/><path d="M4 7l8 4 8-4"/><path d="M12 11v10"/></svg>
+        <span>Produits</span>
+        <span class="nav-count" id="nav-count-products">0</span>
+      </a>
+      <a href="#activity" class="nav-item" data-view="activity">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        <span>Activité</span>
+      </a>
 
-  <main>
-    <header class="hero">
-      <div class="hero-top">
-        <span class="eyebrow">Tableau de bord · Inventaire</span>
-        <span class="eyebrow-date" id="today-date"></span>
+      <span class="nav-section">Alertes</span>
+      <a href="#products" class="nav-item nav-alert" data-view="products" data-filter="low">
+        <span class="nav-dot"></span>
+        <span>Stock critique</span>
+        <span class="nav-count nav-count-alert" id="nav-count-low">0</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="status">
+        <span class="dot"></span>
+        <span>Connecté</span>
       </div>
-      <h1 class="hero-title">
-        L'inventaire, <em>en&nbsp;temps&nbsp;réel</em>.
-      </h1>
-      <p class="hero-sub">
-        Stocks, flux et signaux critiques — unifiés dans un seul tableau de lecture.
-      </p>
+      <span class="version">v1.0</span>
+    </div>
+  </aside>
+
+  <div class="app">
+    <header class="appbar">
+      <div class="appbar-left">
+        <h1 class="page-title" id="page-title">Tableau de bord</h1>
+        <span class="breadcrumb" id="page-sub">Vue d'ensemble · <span id="today-date"></span></span>
+      </div>
+      <div class="appbar-right">
+        <div class="search" id="global-search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="search" id="search" placeholder="Rechercher un produit…" />
+          <kbd>⌘K</kbd>
+        </div>
+        <button class="btn btn-ghost" id="btn-refresh" title="Rafraîchir">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+        </button>
+        <button class="btn btn-primary" id="btn-open-add">
+          <span>＋</span> Nouveau produit
+        </button>
+      </div>
     </header>
 
-    <section class="kpis" aria-label="Indicateurs clés">
-      <article class="kpi" style="--d:0ms">
-        <span class="kpi-label">Références</span>
-        <span class="kpi-value" id="kpi-products">—</span>
-        <span class="kpi-foot">produits actifs</span>
-      </article>
-      <article class="kpi" style="--d:80ms">
-        <span class="kpi-label">Unités totales</span>
-        <span class="kpi-value" id="kpi-units">—</span>
-        <span class="kpi-foot">en stock</span>
-      </article>
-      <article class="kpi kpi-alert" style="--d:160ms">
-        <span class="kpi-label">Stock critique</span>
-        <span class="kpi-value" id="kpi-low">—</span>
-        <span class="kpi-foot"><span id="kpi-empty">0</span> en rupture</span>
-      </article>
-      <article class="kpi" style="--d:240ms">
-        <span class="kpi-label">Mouvements — jour</span>
-        <span class="kpi-value" id="kpi-today">—</span>
-        <span class="kpi-foot">entrées + sorties</span>
-      </article>
-    </section>
+    <div id="error-banner" role="alert"></div>
 
-    <section class="charts">
-      <article class="chart-card chart-flow" style="--d:100ms">
-        <header>
-          <div>
-            <h3>Flux sur 30 jours</h3>
-            <span class="caption">Entrées vs. sorties, journalier</span>
-          </div>
-          <div class="legend">
-            <span class="lg lg-in"><i></i>Entrées</span>
-            <span class="lg lg-out"><i></i>Sorties</span>
-          </div>
-        </header>
-        <div id="chart-flow" class="chart-body"></div>
-      </article>
-
-      <article class="chart-card chart-donut" style="--d:200ms">
-        <header>
-          <div>
-            <h3>Santé du stock</h3>
-            <span class="caption">Distribution des références</span>
-          </div>
-        </header>
-        <div id="chart-donut" class="chart-body"></div>
-      </article>
-
-      <article class="chart-card chart-top" style="--d:300ms">
-        <header>
-          <div>
-            <h3>Top références</h3>
-            <span class="caption">par quantité disponible</span>
-          </div>
-        </header>
-        <div id="chart-top" class="chart-body"></div>
-      </article>
-    </section>
-
-    <section class="panel" style="--d:200ms">
-      <header class="panel-header">
-        <div>
-          <h2>Catalogue</h2>
-          <span class="caption">Gestion des produits</span>
+    <main>
+      <!-- DASHBOARD -->
+      <section class="view" id="view-dashboard">
+        <div class="kpis">
+          <article class="kpi">
+            <div class="kpi-head">
+              <span class="kpi-label">Références</span>
+              <span class="kpi-chip">actives</span>
+            </div>
+            <span class="kpi-value" id="kpi-products">—</span>
+            <span class="kpi-foot">Total catalogue</span>
+          </article>
+          <article class="kpi">
+            <div class="kpi-head">
+              <span class="kpi-label">Unités en stock</span>
+              <span class="kpi-chip">cumulées</span>
+            </div>
+            <span class="kpi-value" id="kpi-units">—</span>
+            <span class="kpi-foot">Tous produits confondus</span>
+          </article>
+          <article class="kpi kpi-warn">
+            <div class="kpi-head">
+              <span class="kpi-label">Stock critique</span>
+              <span class="kpi-chip chip-warn">≤ 5</span>
+            </div>
+            <span class="kpi-value" id="kpi-low">—</span>
+            <span class="kpi-foot"><span id="kpi-empty">0</span> en rupture totale</span>
+          </article>
+          <article class="kpi">
+            <div class="kpi-head">
+              <span class="kpi-label">Mouvements aujourd'hui</span>
+              <span class="kpi-chip" id="kpi-today-chip">—</span>
+            </div>
+            <span class="kpi-value" id="kpi-today">—</span>
+            <span class="kpi-foot">Entrées et sorties</span>
+          </article>
         </div>
-        <div class="panel-actions">
-          <div class="search">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
-            <input type="search" id="search" placeholder="Rechercher un produit…" />
+
+        <div class="grid-2">
+          <article class="card card-flow">
+            <header class="card-head">
+              <div>
+                <h3>Flux sur 30 jours</h3>
+                <span class="caption">Entrées vs sorties, journalier</span>
+              </div>
+              <div class="legend">
+                <span class="lg lg-in"><i></i>Entrées</span>
+                <span class="lg lg-out"><i></i>Sorties</span>
+              </div>
+            </header>
+            <div id="chart-flow" class="chart-body"></div>
+          </article>
+
+          <article class="card card-donut">
+            <header class="card-head">
+              <div>
+                <h3>Santé du stock</h3>
+                <span class="caption">Répartition des références</span>
+              </div>
+            </header>
+            <div id="chart-donut" class="chart-body"></div>
+          </article>
+        </div>
+
+        <div class="grid-2">
+          <article class="card">
+            <header class="card-head">
+              <div>
+                <h3>Top 8 produits</h3>
+                <span class="caption">par quantité disponible</span>
+              </div>
+            </header>
+            <div id="chart-top" class="chart-body"></div>
+          </article>
+
+          <article class="card">
+            <header class="card-head">
+              <div>
+                <h3>Activité récente</h3>
+                <span class="caption">10 derniers mouvements</span>
+              </div>
+              <a href="#activity" class="link-sm" data-view="activity">Tout voir →</a>
+            </header>
+            <ul id="recent-activity" class="history-compact"></ul>
+          </article>
+        </div>
+      </section>
+
+      <!-- PRODUCTS -->
+      <section class="view" id="view-products" hidden>
+        <div class="toolbar">
+          <div class="filters">
+            <button class="chip active" data-filter="">Tous <span id="f-all">0</span></button>
+            <button class="chip" data-filter="low">Critique <span id="f-low">0</span></button>
+            <button class="chip" data-filter="empty">Rupture <span id="f-empty">0</span></button>
+          </div>
+          <span class="toolbar-meta" id="table-meta">0 produits</span>
+        </div>
+        <div class="card card-flush">
+          <div class="table-wrap">
+            <table id="products-table">
+              <thead>
+                <tr>
+                  <th>Produit</th>
+                  <th>Quantité</th>
+                  <th>État</th>
+                  <th class="ta-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="products-body"></tbody>
+            </table>
+            <p id="empty-msg" class="empty">Aucun produit.</p>
           </div>
         </div>
-      </header>
-      <div class="table-wrap">
-        <table id="products-table">
-          <thead>
-            <tr>
-              <th>Produit</th>
-              <th>Quantité</th>
-              <th>État</th>
-              <th class="ta-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="products-body"></tbody>
-        </table>
-        <p id="empty-msg" class="empty">Aucun produit. Ajoute ton premier produit pour démarrer.</p>
-      </div>
-    </section>
+      </section>
 
-    <section class="panel" style="--d:280ms">
-      <header class="panel-header">
-        <div>
-          <h2>Activité récente</h2>
-          <span class="caption">50 derniers mouvements</span>
+      <!-- ACTIVITY -->
+      <section class="view" id="view-activity" hidden>
+        <div class="toolbar">
+          <div class="filters">
+            <button class="chip active" data-hfilter="">Tous</button>
+            <button class="chip" data-hfilter="in">Entrées</button>
+            <button class="chip" data-hfilter="out">Sorties</button>
+            <button class="chip" data-hfilter="create">Créations</button>
+            <button class="chip" data-hfilter="delete">Suppressions</button>
+          </div>
+          <span class="toolbar-meta" id="activity-meta">0 mouvements</span>
         </div>
-      </header>
-      <ul id="history-list" class="history"></ul>
-      <p id="empty-history" class="empty">Aucun mouvement enregistré.</p>
-    </section>
-
-    <footer class="foot">
-      <span>Ledger · inventaire minimaliste</span>
-      <span class="foot-dot">·</span>
-      <span>Node · SQLite · vanilla JS</span>
-    </footer>
-  </main>
+        <div class="card">
+          <ul id="history-list" class="history"></ul>
+          <p id="empty-history" class="empty">Aucun mouvement enregistré.</p>
+        </div>
+      </section>
+    </main>
+  </div>
 
   <dialog id="modal-add" class="modal">
     <form method="dialog" id="add-product-form" class="modal-card">

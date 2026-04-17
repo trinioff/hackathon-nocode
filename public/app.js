@@ -1,13 +1,17 @@
 const API = "/api";
-
 const els = {};
 
 const state = {
   products: [],
   history: [],
   stats: null,
-  filter: "",
+  view: "dashboard",
+  productFilter: "",
+  historyFilter: "",
+  search: "",
 };
+
+/* ============== API ============== */
 
 async function api(path, options = {}) {
   const res = await fetch(API + path, {
@@ -32,7 +36,7 @@ async function refresh() {
   try {
     const [products, history, stats] = await Promise.all([
       api("/products"),
-      api("/history?limit=50"),
+      api("/history?limit=500"),
       api("/stats"),
     ]);
     state.products = products;
@@ -44,9 +48,9 @@ async function refresh() {
   }
 }
 
-function fmt(n) {
-  return new Intl.NumberFormat("fr-FR").format(n);
-}
+/* ============== HELPERS ============== */
+
+function fmt(n) { return new Intl.NumberFormat("fr-FR").format(n); }
 
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, (c) => ({
@@ -67,7 +71,44 @@ function relativeTime(date) {
   return date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
-/* ---------- KPIs ---------- */
+function productState(qty) {
+  if (qty === 0) return "empty";
+  if (qty <= 5) return "low";
+  return "ok";
+}
+
+/* ============== VIEW SWITCHER ============== */
+
+const VIEW_META = {
+  dashboard: { title: "Tableau de bord", sub: "Vue d'ensemble" },
+  products:  { title: "Catalogue",       sub: "Gestion des produits" },
+  activity:  { title: "Activité",        sub: "Historique des mouvements" },
+};
+
+function setView(name, opts = {}) {
+  if (!VIEW_META[name]) name = "dashboard";
+  state.view = name;
+
+  document.querySelectorAll(".view").forEach((v) => {
+    v.hidden = v.id !== `view-${name}`;
+  });
+
+  document.querySelectorAll(".nav-item").forEach((a) => {
+    a.classList.toggle("active", a.dataset.view === name && !a.dataset.filter);
+  });
+
+  els.pageTitle.textContent = VIEW_META[name].title;
+  const todayStr = els.todayDate.textContent;
+  els.pageSub.innerHTML = `${VIEW_META[name].sub} · <span id="today-date">${todayStr}</span>`;
+  els.todayDate = document.getElementById("today-date");
+
+  if (opts.filter) {
+    state.productFilter = opts.filter;
+    renderProductsView();
+  }
+}
+
+/* ============== KPIS ============== */
 
 function renderKpis() {
   const s = state.stats;
@@ -77,14 +118,20 @@ function renderKpis() {
   els.kpiLow.textContent = fmt(s.lowStock);
   els.kpiEmpty.textContent = fmt(s.outOfStock);
   els.kpiToday.textContent = fmt(s.movementsToday);
+
+  els.navCountProducts.textContent = fmt(s.totals.products);
+  els.navCountLow.textContent = fmt(s.lowStock);
+
+  const alertSection = document.querySelector(".nav-item.nav-alert");
+  if (alertSection) alertSection.style.display = s.lowStock > 0 ? "flex" : "none";
 }
 
-/* ---------- Flow chart ---------- */
+/* ============== FLOW ============== */
 
 function renderFlow() {
   const host = els.chartFlow;
   const s = state.stats;
-  if (!s) return;
+  if (!s || !host) return;
 
   const days = [];
   const map = new Map(s.byDay.map((d) => [d.day, d]));
@@ -103,12 +150,8 @@ function renderFlow() {
 
   const max = Math.max(1, ...days.map((d) => Math.max(d.inflow, d.outflow)));
 
-  const W = 760;
-  const H = 220;
-  const padL = 34;
-  const padR = 10;
-  const padT = 12;
-  const padB = 26;
+  const W = 760, H = 240;
+  const padL = 36, padR = 12, padT = 12, padB = 28;
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
   const slot = innerW / days.length;
@@ -138,8 +181,7 @@ function renderFlow() {
           <rect class="flow-bar-out" x="${x + barW + gap}" y="${yOut}" width="${barW}" height="${hOut}" rx="1.5">
             <title>${d.date.toLocaleDateString("fr-FR")} · −${d.outflow}</title>
           </rect>
-        </g>
-      `;
+        </g>`;
     })
     .join("");
 
@@ -155,41 +197,37 @@ function renderFlow() {
   const gridLines = ticks
     .map(
       (t) =>
-        `<line class="flow-axis" x1="${padL}" x2="${W - padR}" y1="${t.y}" y2="${t.y}" stroke-dasharray="${
-          t.v === 0 ? "0" : "2 4"
-        }" opacity="${t.v === 0 ? 0.8 : 0.35}" />
+        `<line class="flow-axis" x1="${padL}" x2="${W - padR}" y1="${t.y}" y2="${t.y}"
+           stroke-dasharray="${t.v === 0 ? "0" : "2 4"}"
+           opacity="${t.v === 0 ? 0.8 : 0.3}" />
          <text class="flow-label" x="${padL - 6}" y="${t.y + 3}" text-anchor="end">${t.v}</text>`
     )
     .join("");
 
-  host.innerHTML = `
-    <svg class="flow-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-      ${gridLines}
-      ${bars}
-      ${xLabels}
-    </svg>
-  `;
+  host.innerHTML = `<svg class="flow-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      ${gridLines}${bars}${xLabels}
+    </svg>`;
 }
 
-/* ---------- Donut ---------- */
+/* ============== DONUT ============== */
 
 function renderDonut() {
   const host = els.chartDonut;
   const s = state.stats;
-  if (!s) return;
+  if (!s || !host) return;
 
   const b = s.buckets || {};
   const segments = [
-    { key: "healthy", label: "Saine (> 20)", value: b.healthy || 0, color: "var(--in)" },
-    { key: "low", label: "Basse (6–20)", value: b.low || 0, color: "var(--accent)" },
-    { key: "critical", label: "Critique (≤ 5)", value: b.critical || 0, color: "var(--warn)" },
-    { key: "empty", label: "Rupture", value: b.empty || 0, color: "var(--out)" },
+    { label: "Saine (> 20)",   value: b.healthy  || 0, color: "var(--in)" },
+    { label: "Basse (6–20)",   value: b.low      || 0, color: "var(--accent)" },
+    { label: "Critique (≤ 5)", value: b.critical || 0, color: "var(--warn)" },
+    { label: "Rupture",        value: b.empty    || 0, color: "var(--out)" },
   ];
 
-  const total = segments.reduce((acc, s2) => acc + s2.value, 0) || 1;
-  const r = 62;
+  const total = segments.reduce((acc, x) => acc + x.value, 0) || 1;
+  const r = 58;
   const C = 2 * Math.PI * r;
-  const stroke = 16;
+  const stroke = 14;
   let offset = 0;
 
   const circles = segments
@@ -197,9 +235,11 @@ function renderDonut() {
       if (seg.value === 0) return "";
       const len = (seg.value / total) * C;
       const dash = `${len - 2} ${C - len + 2}`;
-      const circle = `<circle cx="80" cy="80" r="${r}" fill="none" stroke="${seg.color}" stroke-width="${stroke}" stroke-dasharray="${dash}" stroke-dashoffset="${-offset}" stroke-linecap="butt" />`;
+      const el = `<circle cx="75" cy="75" r="${r}" fill="none" stroke="${seg.color}"
+                   stroke-width="${stroke}" stroke-dasharray="${dash}"
+                   stroke-dashoffset="${-offset}" />`;
       offset += len;
-      return circle;
+      return el;
     })
     .join("");
 
@@ -212,34 +252,31 @@ function renderDonut() {
           ${seg.label}
         </span>
         <span class="lg-n">${seg.value}</span>
-      </li>
-    `
+      </li>`
     )
     .join("");
 
-  host.innerHTML = `
-    <div class="donut-wrap">
-      <div class="donut-center">
-        <svg class="donut-svg" viewBox="0 0 160 160">
-          <circle cx="80" cy="80" r="${r}" fill="none" stroke="var(--surface-2)" stroke-width="${stroke}" />
-          ${circles}
-        </svg>
-        <div class="donut-total">
-          <strong>${s.totals.products}</strong>
-          <span>produits</span>
-        </div>
+  host.innerHTML = `<div class="donut-wrap">
+    <div class="donut-center">
+      <svg class="donut-svg" viewBox="0 0 150 150">
+        <circle cx="75" cy="75" r="${r}" fill="none" stroke="var(--surface-2)" stroke-width="${stroke}" />
+        ${circles}
+      </svg>
+      <div class="donut-total">
+        <strong>${s.totals.products}</strong>
+        <span>produits</span>
       </div>
-      <ul class="donut-legend">${legend}</ul>
     </div>
-  `;
+    <ul class="donut-legend">${legend}</ul>
+  </div>`;
 }
 
-/* ---------- Top products ---------- */
+/* ============== TOP ============== */
 
 function renderTop() {
   const host = els.chartTop;
   const s = state.stats;
-  if (!s) return;
+  if (!s || !host) return;
   const top = s.topProducts || [];
   if (top.length === 0) {
     host.innerHTML = `<p class="empty" style="margin:auto">Aucune donnée.</p>`;
@@ -254,14 +291,13 @@ function renderTop() {
           <span class="top-name">${escapeHtml(p.name)}</span>
           <span class="top-qty">${fmt(p.qty)}</span>
           <span class="top-bar"><span class="top-bar-fill" style="width:${pct}%"></span></span>
-        </li>
-      `;
+        </li>`;
     })
     .join("");
   host.innerHTML = `<ul class="top-list">${rows}</ul>`;
 }
 
-/* ---------- Products table ---------- */
+/* ============== PRODUCTS TABLE ============== */
 
 function stateTag(qty) {
   if (qty === 0) return `<span class="state-tag state-empty"><i></i>Rupture</span>`;
@@ -270,26 +306,45 @@ function stateTag(qty) {
   return `<span class="state-tag state-ok"><i></i>Saine</span>`;
 }
 
-function renderProducts() {
+function filteredProducts() {
+  const q = state.search.trim().toLowerCase();
+  let list = state.products;
+  if (q) list = list.filter((p) => p.name.toLowerCase().includes(q));
+  if (state.productFilter === "low") list = list.filter((p) => p.qty > 0 && p.qty <= 5);
+  else if (state.productFilter === "empty") list = list.filter((p) => p.qty === 0);
+  return list;
+}
+
+function renderProductsView() {
+  const list = filteredProducts();
   const body = els.productsBody;
   const empty = els.emptyMsg;
   body.innerHTML = "";
 
-  const filter = state.filter.trim().toLowerCase();
-  const filtered = filter
-    ? state.products.filter((p) => p.name.toLowerCase().includes(filter))
-    : state.products;
+  els.tableMeta.textContent = `${list.length} produit${list.length > 1 ? "s" : ""}`;
+  els.fAll.textContent = state.products.length;
+  els.fLow.textContent = state.products.filter((p) => p.qty > 0 && p.qty <= 5).length;
+  els.fEmpty.textContent = state.products.filter((p) => p.qty === 0).length;
 
-  if (filtered.length === 0) {
+  document.querySelectorAll("[data-filter]").forEach((b) => {
+    if (b.classList.contains("chip")) {
+      b.classList.toggle("active", (b.dataset.filter || "") === state.productFilter);
+    }
+  });
+
+  if (list.length === 0) {
     empty.style.display = "block";
-    empty.textContent = filter
-      ? `Aucun résultat pour "${state.filter}".`
+    empty.textContent = state.search
+      ? `Aucun résultat pour "${state.search}".`
+      : state.productFilter
+      ? "Aucun produit dans cette catégorie."
       : "Aucun produit. Ajoute ton premier produit pour démarrer.";
     return;
   }
   empty.style.display = "none";
 
-  for (const p of filtered) {
+  const frag = document.createDocumentFragment();
+  for (const p of list) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td><span class="product-name">${escapeHtml(p.name)}</span></td>
@@ -297,99 +352,85 @@ function renderProducts() {
       <td>${stateTag(p.qty)}</td>
       <td class="ta-right">
         <div class="actions">
-          <button class="row-btn in-btn" data-id="${p.id}" data-action="in">+ Entrée</button>
-          <button class="row-btn out-btn" data-id="${p.id}" data-action="out">− Sortie</button>
-          <button class="row-btn del-btn" data-id="${p.id}" data-action="del">Supprimer</button>
+          <button class="row-btn in-btn" data-id="${p.id}" data-action="in">Entrée</button>
+          <button class="row-btn out-btn" data-id="${p.id}" data-action="out">Sortie</button>
+          <button class="row-btn del-btn" data-id="${p.id}" data-action="del">✕</button>
         </div>
-      </td>
-    `;
-    body.appendChild(tr);
+      </td>`;
+    frag.appendChild(tr);
   }
+  body.appendChild(frag);
 }
 
-/* ---------- History ---------- */
+/* ============== HISTORY ============== */
 
-function renderHistory() {
+function renderHistoryItem(h) {
+  const d = parseSqliteDate(h.created_at);
+  const rel = relativeTime(d);
+  const name = escapeHtml(h.product_name);
+  let iconClass = "hi-create", iconTxt = "✦", sub = "";
+  if (h.type === "in")         { iconClass = "hi-in";     iconTxt = "+"; sub = `+${h.amount} en stock`; }
+  else if (h.type === "out")   { iconClass = "hi-out";    iconTxt = "−"; sub = `−${h.amount} du stock`; }
+  else if (h.type === "create"){ iconClass = "hi-create"; iconTxt = "✦"; sub = `Créé (qté initiale ${h.amount})`; }
+  else if (h.type === "delete"){ iconClass = "hi-delete"; iconTxt = "✕"; sub = `Supprimé`; }
+  return `<li>
+    <span class="hist-icon ${iconClass}">${iconTxt}</span>
+    <span class="hist-body"><strong>${name}</strong><span>${sub}</span></span>
+    <span class="hist-time" title="${d.toLocaleString("fr-FR")}">${rel}</span>
+  </li>`;
+}
+
+function renderRecent() {
+  const list = els.recentActivity;
+  if (!list) return;
+  const slice = state.history.slice(0, 10);
+  list.innerHTML = slice.map(renderHistoryItem).join("") ||
+    `<p class="empty">Aucun mouvement.</p>`;
+}
+
+function renderHistoryView() {
   const list = els.historyList;
   const empty = els.emptyHistory;
-  list.innerHTML = "";
+  const filter = state.historyFilter;
+  const items = filter ? state.history.filter((h) => h.type === filter) : state.history;
 
-  if (state.history.length === 0) {
+  els.activityMeta.textContent = `${items.length} mouvement${items.length > 1 ? "s" : ""}`;
+
+  document.querySelectorAll("[data-hfilter]").forEach((b) => {
+    b.classList.toggle("active", (b.dataset.hfilter || "") === filter);
+  });
+
+  if (items.length === 0) {
+    list.innerHTML = "";
     empty.style.display = "block";
     return;
   }
   empty.style.display = "none";
-
-  for (const h of state.history) {
-    const li = document.createElement("li");
-    const d = parseSqliteDate(h.created_at);
-    const rel = relativeTime(d);
-    const name = escapeHtml(h.product_name);
-    let iconClass = "hi-create";
-    let iconTxt = "★";
-    let title = "";
-    let sub = "";
-    if (h.type === "in") {
-      iconClass = "hi-in"; iconTxt = "+";
-      title = `<strong>${name}</strong>`;
-      sub = `+${h.amount} en stock`;
-    } else if (h.type === "out") {
-      iconClass = "hi-out"; iconTxt = "−";
-      title = `<strong>${name}</strong>`;
-      sub = `−${h.amount} du stock`;
-    } else if (h.type === "create") {
-      iconClass = "hi-create"; iconTxt = "✦";
-      title = `<strong>${name}</strong>`;
-      sub = `Produit créé (qté initiale ${h.amount})`;
-    } else if (h.type === "delete") {
-      iconClass = "hi-delete"; iconTxt = "✕";
-      title = `<strong>${name}</strong>`;
-      sub = `Produit supprimé`;
-    }
-    li.innerHTML = `
-      <span class="hist-icon ${iconClass}">${iconTxt}</span>
-      <span class="hist-body">${title}<span>${sub}</span></span>
-      <span class="hist-time" title="${d.toLocaleString("fr-FR")}">${rel}</span>
-    `;
-    list.appendChild(li);
-  }
+  list.innerHTML = items.map(renderHistoryItem).join("");
 }
+
+/* ============== RENDER ============== */
 
 function render() {
   renderKpis();
   renderFlow();
   renderDonut();
   renderTop();
-  renderProducts();
-  renderHistory();
+  renderProductsView();
+  renderHistoryView();
+  renderRecent();
 }
 
-/* ---------- Actions ---------- */
+/* ============== ACTIONS ============== */
 
 async function addProduct(name, qty) {
-  try {
-    await api("/products", {
-      method: "POST",
-      body: JSON.stringify({ name, qty }),
-    });
-    await refresh();
-  } catch (err) {
-    showError(err.message);
-    throw err;
-  }
+  await api("/products", { method: "POST", body: JSON.stringify({ name, qty }) });
+  await refresh();
 }
 
 async function changeStock(id, delta) {
-  try {
-    await api(`/products/${id}/stock`, {
-      method: "POST",
-      body: JSON.stringify({ delta }),
-    });
-    await refresh();
-  } catch (err) {
-    showError(err.message);
-    throw err;
-  }
+  await api(`/products/${id}/stock`, { method: "POST", body: JSON.stringify({ delta }) });
+  await refresh();
 }
 
 async function deleteProduct(id, name) {
@@ -397,12 +438,10 @@ async function deleteProduct(id, name) {
   try {
     await api(`/products/${id}`, { method: "DELETE" });
     await refresh();
-  } catch (err) {
-    showError(err.message);
-  }
+  } catch (err) { showError(err.message); }
 }
 
-/* ---------- Modals ---------- */
+/* ============== MODALS ============== */
 
 function openModal(dialog) {
   if (typeof dialog.showModal === "function") dialog.showModal();
@@ -411,6 +450,23 @@ function openModal(dialog) {
 function closeModal(dialog) {
   if (typeof dialog.close === "function") dialog.close();
   else dialog.removeAttribute("open");
+}
+
+function openStockModal(product, dir) {
+  els.stockForm.dataset.productId = product.id;
+  els.stockForm.dataset.dir = dir;
+  document.getElementById("stock-title").textContent =
+    dir === "in" ? "Ajouter au stock" : "Retirer du stock";
+  document.getElementById("stock-sub").textContent =
+    `${product.name} · stock actuel ${product.qty}`;
+  document.getElementById("stock-confirm").textContent =
+    dir === "in" ? "Ajouter" : "Retirer";
+  document.getElementById("stock-amount").value = 1;
+  openModal(els.modalStock);
+  setTimeout(() => {
+    const i = document.getElementById("stock-amount");
+    i.focus(); i.select();
+  }, 50);
 }
 
 function wireModals() {
@@ -436,7 +492,7 @@ function wireModals() {
     try {
       await addProduct(name, qty);
       closeModal(els.modalAdd);
-    } catch {}
+    } catch (err) { showError(err.message); }
   });
 
   els.stockForm.addEventListener("submit", async (e) => {
@@ -448,31 +504,32 @@ function wireModals() {
     try {
       await changeStock(id, dir === "in" ? amount : -amount);
       closeModal(els.modalStock);
-    } catch {}
+    } catch (err) { showError(err.message); }
   });
 }
 
-function openStockModal(product, dir) {
-  els.stockForm.dataset.productId = product.id;
-  els.stockForm.dataset.dir = dir;
-  document.getElementById("stock-title").textContent =
-    dir === "in" ? "Ajouter au stock" : "Retirer du stock";
-  document.getElementById("stock-sub").textContent =
-    `${product.name} · stock actuel ${product.qty}`;
-  document.getElementById("stock-confirm").textContent =
-    dir === "in" ? "Ajouter" : "Retirer";
-  document.getElementById("stock-amount").value = 1;
-  openModal(els.modalStock);
-  setTimeout(() => {
-    const i = document.getElementById("stock-amount");
-    i.focus();
-    i.select();
-  }, 50);
-}
+/* ============== NAV + FILTERS ============== */
 
-/* ---------- Wire ---------- */
+function wireNav() {
+  document.querySelectorAll(".nav-item").forEach((a) => {
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      const view = a.dataset.view;
+      const filter = a.dataset.filter || "";
+      if (view === "products") state.productFilter = filter;
+      setView(view);
+    });
+  });
 
-function wireTable() {
+  document.querySelectorAll("[data-view]").forEach((a) => {
+    if (a.tagName === "A" && !a.classList.contains("nav-item")) {
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        setView(a.dataset.view);
+      });
+    }
+  });
+
   els.productsBody.addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-action]");
     if (!btn) return;
@@ -484,39 +541,90 @@ function wireTable() {
     else if (btn.dataset.action === "del") deleteProduct(id, product.name);
   });
 
+  document.querySelectorAll(".chip[data-filter]").forEach((c) => {
+    c.addEventListener("click", () => {
+      state.productFilter = c.dataset.filter || "";
+      renderProductsView();
+    });
+  });
+
+  document.querySelectorAll(".chip[data-hfilter]").forEach((c) => {
+    c.addEventListener("click", () => {
+      state.historyFilter = c.dataset.hfilter || "";
+      renderHistoryView();
+    });
+  });
+
   els.search.addEventListener("input", (e) => {
-    state.filter = e.target.value;
-    renderProducts();
+    state.search = e.target.value;
+    if (state.view !== "products") setView("products");
+    renderProductsView();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      els.search.focus();
+    }
+  });
+
+  els.btnRefresh.addEventListener("click", () => {
+    els.btnRefresh.querySelector("svg").style.transition = "transform 0.5s";
+    els.btnRefresh.querySelector("svg").style.transform = "rotate(360deg)";
+    setTimeout(() => {
+      els.btnRefresh.querySelector("svg").style.transform = "";
+    }, 500);
+    refresh();
   });
 }
 
+/* ============== INIT ============== */
+
 function initTodayLabel() {
   const d = new Date();
-  els.todayDate.textContent = d.toLocaleDateString("fr-FR", {
+  const str = d.toLocaleDateString("fr-FR", {
     weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
   });
+  els.todayDate.textContent = str;
 }
 
 function bindEls() {
   els.error = document.getElementById("error-banner");
+  els.pageTitle = document.getElementById("page-title");
+  els.pageSub = document.getElementById("page-sub");
+  els.todayDate = document.getElementById("today-date");
+
   els.kpiProducts = document.getElementById("kpi-products");
   els.kpiUnits = document.getElementById("kpi-units");
   els.kpiLow = document.getElementById("kpi-low");
   els.kpiEmpty = document.getElementById("kpi-empty");
   els.kpiToday = document.getElementById("kpi-today");
+
+  els.navCountProducts = document.getElementById("nav-count-products");
+  els.navCountLow = document.getElementById("nav-count-low");
+
   els.chartFlow = document.getElementById("chart-flow");
   els.chartDonut = document.getElementById("chart-donut");
   els.chartTop = document.getElementById("chart-top");
+
   els.productsBody = document.getElementById("products-body");
   els.emptyMsg = document.getElementById("empty-msg");
   els.historyList = document.getElementById("history-list");
   els.emptyHistory = document.getElementById("empty-history");
+  els.recentActivity = document.getElementById("recent-activity");
+
+  els.tableMeta = document.getElementById("table-meta");
+  els.activityMeta = document.getElementById("activity-meta");
+  els.fAll = document.getElementById("f-all");
+  els.fLow = document.getElementById("f-low");
+  els.fEmpty = document.getElementById("f-empty");
+
   els.search = document.getElementById("search");
-  els.todayDate = document.getElementById("today-date");
   els.btnOpenAdd = document.getElementById("btn-open-add");
+  els.btnRefresh = document.getElementById("btn-refresh");
   els.modalAdd = document.getElementById("modal-add");
   els.modalStock = document.getElementById("modal-stock");
   els.addForm = document.getElementById("add-product-form");
@@ -527,7 +635,7 @@ document.addEventListener("DOMContentLoaded", () => {
   bindEls();
   initTodayLabel();
   wireModals();
-  wireTable();
+  wireNav();
   refresh();
   setInterval(refresh, 30000);
 });
