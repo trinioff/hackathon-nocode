@@ -1,4 +1,11 @@
 const db = require("./db");
+const bcrypt = require("bcryptjs");
+
+const USERS = [
+  { email: "admin@ledger.app",  name: "Alice Administratrice", role: "admin",  password: "admin" },
+  { email: "editor@ledger.app", name: "Éva Éditrice",          role: "editor", password: "editor" },
+  { email: "viewer@ledger.app", name: "Luc Lecteur",           role: "viewer", password: "viewer" },
+];
 
 const PRODUCTS = [
   { name: "Clavier mécanique K7", qty: 42 },
@@ -51,10 +58,23 @@ function iso(date) {
   );
 }
 
+function seedUsers() {
+  db.exec("DELETE FROM sessions; DELETE FROM users;");
+  db.exec("DELETE FROM sqlite_sequence WHERE name = 'users';");
+  const ins = db.prepare(
+    "INSERT INTO users (email, name, role, password_hash) VALUES (?, ?, ?, ?)"
+  );
+  for (const u of USERS) {
+    ins.run(u.email, u.name, u.role, bcrypt.hashSync(u.password, 10));
+  }
+  console.log(`Seeded ${USERS.length} users (admin/editor/viewer — password = role).`);
+}
+
 function run() {
   console.log("Wiping existing data…");
   db.exec("DELETE FROM movements; DELETE FROM products;");
   db.exec("DELETE FROM sqlite_sequence WHERE name IN ('products','movements');");
+  seedUsers();
 
   const insertProduct = db.prepare(
     "INSERT INTO products (name, qty, created_at) VALUES (?, ?, ?)"

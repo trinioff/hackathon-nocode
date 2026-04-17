@@ -31,15 +31,14 @@
           <span>Mot de passe</span>
           <input type="password" id="login-password" placeholder="••••••••" required minlength="1" />
         </label>
-        <div class="login-row">
-          <label class="check">
-            <input type="checkbox" id="login-remember" />
-            <span>Se souvenir de moi</span>
-          </label>
-          <a href="#" class="login-link" onclick="event.preventDefault()">Mot de passe oublié ?</a>
-        </div>
+        <p id="login-error" class="login-error" hidden></p>
         <button type="submit" class="btn btn-primary btn-block">Se connecter</button>
-        <p class="login-hint">Démo — n'importe quel email et mot de passe suffisent.</p>
+        <div class="login-hint">
+          <strong>Comptes de démo</strong>
+          <code>admin@ledger.app / admin</code>
+          <code>editor@ledger.app / editor</code>
+          <code>viewer@ledger.app / viewer</code>
+        </div>
       </form>
     </div>
   </section>
@@ -72,6 +71,13 @@
         <span>Stock critique</span>
         <span class="nav-count nav-count-alert" id="nav-count-low">0</span>
       </a>
+
+      <span class="nav-section" data-requires-role="admin">Administration</span>
+      <a href="#users" class="nav-item" data-view="users" data-requires-role="admin">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Utilisateurs</span>
+        <span class="nav-count" id="nav-count-users">0</span>
+      </a>
     </nav>
 
     <div class="sidebar-foot">
@@ -103,7 +109,7 @@
         <button class="btn btn-ghost" id="btn-refresh" title="Rafraîchir">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
         </button>
-        <button class="btn btn-primary" id="btn-open-add">
+        <button class="btn btn-primary" id="btn-open-add" data-requires-role="admin,editor">
           <span>＋</span> Nouveau produit
         </button>
       </div>
@@ -227,6 +233,33 @@
         </div>
       </section>
 
+      <!-- USERS -->
+      <section class="view" id="view-users" hidden>
+        <div class="toolbar">
+          <span class="toolbar-meta" id="users-meta">0 utilisateurs</span>
+          <button class="btn btn-primary" id="btn-open-user">
+            <span>＋</span> Nouvel utilisateur
+          </button>
+        </div>
+        <div class="card card-flush">
+          <div class="table-wrap">
+            <table id="users-table">
+              <thead>
+                <tr>
+                  <th>Nom</th>
+                  <th>Email</th>
+                  <th>Rôle</th>
+                  <th>Créé</th>
+                  <th class="ta-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="users-body"></tbody>
+            </table>
+            <p id="empty-users" class="empty">Aucun utilisateur.</p>
+          </div>
+        </div>
+      </section>
+
       <!-- ACTIVITY -->
       <section class="view" id="view-activity" hidden>
         <div class="toolbar">
@@ -264,6 +297,39 @@
       <footer>
         <button type="button" class="btn btn-ghost" data-close>Annuler</button>
         <button type="submit" class="btn btn-primary">Créer</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="modal-user" class="modal">
+    <form method="dialog" id="user-form" class="modal-card">
+      <header>
+        <h3 id="user-title">Nouvel utilisateur</h3>
+        <button type="button" class="icon-btn" data-close>×</button>
+      </header>
+      <label>
+        <span>Nom complet</span>
+        <input type="text" id="user-name-input" placeholder="Prénom Nom" required />
+      </label>
+      <label>
+        <span>Email</span>
+        <input type="email" id="user-email-input" placeholder="personne@ledger.app" required />
+      </label>
+      <label>
+        <span>Rôle</span>
+        <select id="user-role-input" required>
+          <option value="admin">Administrateur — accès total</option>
+          <option value="editor" selected>Éditeur — gestion des stocks</option>
+          <option value="viewer">Lecteur — consultation</option>
+        </select>
+      </label>
+      <label>
+        <span id="user-password-label">Mot de passe</span>
+        <input type="password" id="user-password-input" placeholder="••••••••" minlength="4" autocomplete="new-password" />
+      </label>
+      <footer>
+        <button type="button" class="btn btn-ghost" data-close>Annuler</button>
+        <button type="submit" class="btn btn-primary" id="user-confirm">Créer</button>
       </footer>
     </form>
   </dialog>
