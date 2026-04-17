@@ -95,6 +95,63 @@ app.get("/api/history", (req, res) => {
   res.json(stmts.listMovements.all(limit));
 });
 
+app.get("/api/stats", (_req, res) => {
+  const totals = db
+    .prepare("SELECT COUNT(*) AS products, COALESCE(SUM(qty), 0) AS units FROM products")
+    .get();
+
+  const lowStock = db
+    .prepare("SELECT COUNT(*) AS n FROM products WHERE qty <= 5")
+    .get().n;
+
+  const outOfStock = db
+    .prepare("SELECT COUNT(*) AS n FROM products WHERE qty = 0")
+    .get().n;
+
+  const movementsToday = db
+    .prepare(
+      "SELECT COUNT(*) AS n FROM movements WHERE DATE(created_at) = DATE('now') AND type IN ('in','out')"
+    )
+    .get().n;
+
+  const byDay = db
+    .prepare(
+      `SELECT DATE(created_at) AS day,
+              SUM(CASE WHEN type = 'in'  THEN amount ELSE 0 END) AS inflow,
+              SUM(CASE WHEN type = 'out' THEN amount ELSE 0 END) AS outflow
+       FROM movements
+       WHERE DATE(created_at) >= DATE('now', '-29 days')
+       GROUP BY DATE(created_at)
+       ORDER BY DATE(created_at) ASC`
+    )
+    .all();
+
+  const topProducts = db
+    .prepare("SELECT id, name, qty FROM products ORDER BY qty DESC LIMIT 8")
+    .all();
+
+  const buckets = db
+    .prepare(
+      `SELECT
+         SUM(CASE WHEN qty = 0 THEN 1 ELSE 0 END) AS empty,
+         SUM(CASE WHEN qty > 0 AND qty <= 5 THEN 1 ELSE 0 END) AS critical,
+         SUM(CASE WHEN qty > 5 AND qty <= 20 THEN 1 ELSE 0 END) AS low,
+         SUM(CASE WHEN qty > 20 THEN 1 ELSE 0 END) AS healthy
+       FROM products`
+    )
+    .get();
+
+  res.json({
+    totals,
+    lowStock,
+    outOfStock,
+    movementsToday,
+    byDay,
+    topProducts,
+    buckets,
+  });
+});
+
 app.use((err, _req, res, _next) => {
   console.error(err);
   res.status(500).json({ error: "Erreur serveur." });

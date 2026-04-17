@@ -3,48 +3,197 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gestion de Stock</title>
+  <title>Ledger — Gestion de stock</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,700;1,9..144,400;1,9..144,600&family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header>
-    <h1>Gestion de Stock</h1>
-    <p class="subtitle">Suivi des produits et mouvements</p>
-  </header>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="glow glow-1" aria-hidden="true"></div>
+  <div class="glow glow-2" aria-hidden="true"></div>
+
+  <nav class="topbar">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-name">Ledger<em>.</em></span>
+    </div>
+    <div class="topbar-meta">
+      <span class="dot"></span>
+      <span id="live-label">Connecté</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-ghost" id="btn-seed-info" title="Pour générer des données, exécuter `npm run seed`">Données de démo</button>
+      <button class="btn btn-primary" id="btn-open-add">
+        <span>＋</span> Nouveau produit
+      </button>
+    </div>
+  </nav>
 
   <div id="error-banner" role="alert"></div>
 
   <main>
-    <section class="card">
-      <h2>Ajouter un produit</h2>
-      <form id="add-product-form" class="row">
-        <input type="text" id="product-name" placeholder="Nom du produit" required />
-        <input type="number" id="product-qty" placeholder="Quantité initiale" min="0" value="0" required />
-        <button type="submit">Créer</button>
-      </form>
+    <header class="hero">
+      <div class="hero-top">
+        <span class="eyebrow">Tableau de bord · Inventaire</span>
+        <span class="eyebrow-date" id="today-date"></span>
+      </div>
+      <h1 class="hero-title">
+        L'inventaire, <em>en&nbsp;temps&nbsp;réel</em>.
+      </h1>
+      <p class="hero-sub">
+        Stocks, flux et signaux critiques — unifiés dans un seul tableau de lecture.
+      </p>
+    </header>
+
+    <section class="kpis" aria-label="Indicateurs clés">
+      <article class="kpi" style="--d:0ms">
+        <span class="kpi-label">Références</span>
+        <span class="kpi-value" id="kpi-products">—</span>
+        <span class="kpi-foot">produits actifs</span>
+      </article>
+      <article class="kpi" style="--d:80ms">
+        <span class="kpi-label">Unités totales</span>
+        <span class="kpi-value" id="kpi-units">—</span>
+        <span class="kpi-foot">en stock</span>
+      </article>
+      <article class="kpi kpi-alert" style="--d:160ms">
+        <span class="kpi-label">Stock critique</span>
+        <span class="kpi-value" id="kpi-low">—</span>
+        <span class="kpi-foot"><span id="kpi-empty">0</span> en rupture</span>
+      </article>
+      <article class="kpi" style="--d:240ms">
+        <span class="kpi-label">Mouvements — jour</span>
+        <span class="kpi-value" id="kpi-today">—</span>
+        <span class="kpi-foot">entrées + sorties</span>
+      </article>
     </section>
 
-    <section class="card">
-      <h2>Produits en stock</h2>
-      <table id="products-table">
-        <thead>
-          <tr>
-            <th>Nom</th>
-            <th>Quantité</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="products-body"></tbody>
-      </table>
-      <p id="empty-msg" class="empty">Aucun produit. Ajoute ton premier produit ci-dessus.</p>
+    <section class="charts">
+      <article class="chart-card chart-flow" style="--d:100ms">
+        <header>
+          <div>
+            <h3>Flux sur 30 jours</h3>
+            <span class="caption">Entrées vs. sorties, journalier</span>
+          </div>
+          <div class="legend">
+            <span class="lg lg-in"><i></i>Entrées</span>
+            <span class="lg lg-out"><i></i>Sorties</span>
+          </div>
+        </header>
+        <div id="chart-flow" class="chart-body"></div>
+      </article>
+
+      <article class="chart-card chart-donut" style="--d:200ms">
+        <header>
+          <div>
+            <h3>Santé du stock</h3>
+            <span class="caption">Distribution des références</span>
+          </div>
+        </header>
+        <div id="chart-donut" class="chart-body"></div>
+      </article>
+
+      <article class="chart-card chart-top" style="--d:300ms">
+        <header>
+          <div>
+            <h3>Top références</h3>
+            <span class="caption">par quantité disponible</span>
+          </div>
+        </header>
+        <div id="chart-top" class="chart-body"></div>
+      </article>
     </section>
 
-    <section class="card">
-      <h2>Historique des mouvements</h2>
-      <ul id="history-list"></ul>
+    <section class="panel" style="--d:200ms">
+      <header class="panel-header">
+        <div>
+          <h2>Catalogue</h2>
+          <span class="caption">Gestion des produits</span>
+        </div>
+        <div class="panel-actions">
+          <div class="search">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+            <input type="search" id="search" placeholder="Rechercher un produit…" />
+          </div>
+        </div>
+      </header>
+      <div class="table-wrap">
+        <table id="products-table">
+          <thead>
+            <tr>
+              <th>Produit</th>
+              <th>Quantité</th>
+              <th>État</th>
+              <th class="ta-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="products-body"></tbody>
+        </table>
+        <p id="empty-msg" class="empty">Aucun produit. Ajoute ton premier produit pour démarrer.</p>
+      </div>
+    </section>
+
+    <section class="panel" style="--d:280ms">
+      <header class="panel-header">
+        <div>
+          <h2>Activité récente</h2>
+          <span class="caption">50 derniers mouvements</span>
+        </div>
+      </header>
+      <ul id="history-list" class="history"></ul>
       <p id="empty-history" class="empty">Aucun mouvement enregistré.</p>
     </section>
+
+    <footer class="foot">
+      <span>Ledger · inventaire minimaliste</span>
+      <span class="foot-dot">·</span>
+      <span>Node · SQLite · vanilla JS</span>
+    </footer>
   </main>
+
+  <dialog id="modal-add" class="modal">
+    <form method="dialog" id="add-product-form" class="modal-card">
+      <header>
+        <h3>Nouveau produit</h3>
+        <button type="button" class="icon-btn" data-close>×</button>
+      </header>
+      <label>
+        <span>Nom</span>
+        <input type="text" id="product-name" placeholder="ex. Clavier mécanique" required autocomplete="off" />
+      </label>
+      <label>
+        <span>Quantité initiale</span>
+        <input type="number" id="product-qty" min="0" value="0" required />
+      </label>
+      <footer>
+        <button type="button" class="btn btn-ghost" data-close>Annuler</button>
+        <button type="submit" class="btn btn-primary">Créer</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="modal-stock" class="modal">
+    <form method="dialog" id="stock-form" class="modal-card">
+      <header>
+        <h3 id="stock-title">Ajuster le stock</h3>
+        <button type="button" class="icon-btn" data-close>×</button>
+      </header>
+      <p class="modal-sub" id="stock-sub"></p>
+      <label>
+        <span>Quantité</span>
+        <input type="number" id="stock-amount" min="1" value="1" required />
+      </label>
+      <footer>
+        <button type="button" class="btn btn-ghost" data-close>Annuler</button>
+        <button type="submit" class="btn btn-primary" id="stock-confirm">Valider</button>
+      </footer>
+    </form>
+  </dialog>
 
   <script src="app.js"></script>
 </body>
